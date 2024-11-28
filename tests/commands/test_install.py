@@ -10,8 +10,8 @@ from parameterized import parameterized
 class TestMockpipMain(unittest.TestCase):
 
     def run_command(self, command: str):
-        return subprocess.run(
-            shlex.split(f"mockpip {command}"),  # noqa: S603
+        return subprocess.run(  # noqa: S603
+            shlex.split(f"mockpip {command}"),
             capture_output=True,
             text=True,
             check=False
