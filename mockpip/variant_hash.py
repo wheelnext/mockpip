@@ -63,12 +63,21 @@ def read_provider_priority_from_pip_config() -> dict[str, int]:
         return {}
 
 
-def get_variant_hashes_by_priority() -> Generator[VariantDescription]:
+def get_variant_hashes_by_priority(
+    provider_priority_dict: dict[str:int] | None = None,
+) -> Generator[VariantDescription]:
     logger.info("Discovering plugins...")
     plugins = entry_points().select(group="mockpip.plugins")
 
-    # sorting providers in priority order:
-    provider_priority_dict = read_provider_priority_from_pip_config()
+    if provider_priority_dict is not None:
+        plugins = [
+            plugin for plugin in plugins if plugin.name in provider_priority_dict
+        ]
+
+    else:
+        # sorting providers in priority order:
+        provider_priority_dict = read_provider_priority_from_pip_config()
+
     plugins = sorted(plugins, key=lambda plg: provider_priority_dict.get(plg.name, 1e6))
 
     provider_cfgs = []

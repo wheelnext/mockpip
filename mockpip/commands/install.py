@@ -37,6 +37,21 @@ def install(args: list[str]) -> int:
         help="Python Package Repository URL.",
     )
 
+    parser.add_argument(
+        "-p",
+        "--variant_provider",
+        dest="variant_providers",
+        action="append",
+        help="Variant Providers in order of priority",
+    )
+
+    parser.add_argument(
+        "--no_variants",
+        action="store_true",
+        default=False,
+        help="disables variant support",
+    )
+
     parsed_args = parser.parse_args(args)
 
     logger.info(
@@ -63,31 +78,49 @@ def install(args: list[str]) -> int:
 
     logger.info("")  # visual spacing
 
-    if (forced_vhash := os.environ.get("PIP_FORCE_INSTALL_VARIANT_HASH", None)) is None:
-        selected_pkg = None
-        for vid, vdesc in enumerate(get_variant_hashes_by_priority()):
-            vhash = vdesc.hexdigest
-            selected_pkg = pkg_candidate_dict_by_vhash.get(vhash)
+    if not parsed_args.no_variants:
+        variant_providers = parsed_args.variant_providers
+        variant_providers = (
+            {name: idx for idx, name in enumerate(variant_providers)}
+            if variant_providers is not None
+            else None
+        )
 
-            logger.info(
-                f"[Variant: {vid:04d}] `{vhash}`: "
-                f"{'FOUND' if selected_pkg is not None else 'NOT FOUND'} ..."
-            )
+        if (
+            forced_vhash := os.environ.get("PIP_FORCE_INSTALL_VARIANT_HASH", None)
+        ) is None:
+            selected_pkg = None
+            for vid, vdesc in enumerate(
+                get_variant_hashes_by_priority(variant_providers)
+            ):
+                vhash = vdesc.hexdigest
+                selected_pkg = pkg_candidate_dict_by_vhash.get(vhash)
 
-            if selected_pkg is not None:
-                logger.info("Selected Variant:")
-                from pprint import pprint
+                logger.info(
+                    f"[Variant: {vid:04d}] `{vhash}`: "
+                    f"{'FOUND' if selected_pkg is not None else 'NOT FOUND'} ..."
+                )
 
-                pprint(vdesc.serialize())
-                break
+                if selected_pkg is not None:
+                    logger.info("Selected Variant:")
+                    from pprint import pprint
+
+                    pprint(vdesc.serialize())
+                    break
+
+            else:
+                # The one package without variant information
+                selected_pkg = pkg_candidate_dict_by_vhash[None]
+
+        elif (
+            re.match(rf"^[a-fA-F0-9]{{{VARIANT_HASH_LEN}}}$", forced_vhash) is not None
+        ):
+            logger.info(f"Forced installation of variant: {forced_vhash}")
+            selected_pkg = pkg_candidate_dict_by_vhash.get(forced_vhash)
 
         else:
-            # The one package without variant information
-            selected_pkg = pkg_candidate_dict_by_vhash[None]
-
-    elif re.match(rf"^[a-fA-F0-9]{{{VARIANT_HASH_LEN}}}$", forced_vhash) is not None:
-        logger.info(f"Forced installation of variant: {forced_vhash}")
-        selected_pkg = pkg_candidate_dict_by_vhash.get(forced_vhash)
+            logger.info("Forced installation to ignore variant ...")
+            selected_pkg = pkg_candidate_dict_by_vhash.get(None)
 
     else:
         logger.info("Forced installation to ignore variant ...")
