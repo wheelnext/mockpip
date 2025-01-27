@@ -2,12 +2,16 @@
 
 import argparse
 import logging
+import os
+import re
 from urllib.parse import unquote
+
+from variantlib import VARIANT_HASH_LEN
 
 from mockpip.progress_bar import fake_install_progress
 from mockpip.repository import list_candidates
-from mockpip.variant_hash import discover_and_run_plugins
 from mockpip.variant_hash import get_variant_hash_from_wheel
+from mockpip.variant_hash import get_variant_hashes_by_priority
 
 logger = logging.getLogger(__name__)
 
@@ -44,27 +48,63 @@ def install(args: list[str]) -> int:
         package_name=parsed_args.package_name, index_url=parsed_args.index_url
     )
 
-    logger.info("")
-    for pkg in pkg_candidates:
-        filename = unquote(pkg.filename)
-        logger.info(f"Found: `{filename}`")
-        variant_hash = get_variant_hash_from_wheel(filename)
-
     if not pkg_candidates:
         logger.error(f"No candidate package was found for `{parsed_args.package_name}`")
         return 1
 
-    discover_and_run_plugins()
+    logger.info("")  # visual spacing
 
-    selected_pkg = pkg_candidates[0]
-    logger.info("")
-    logger.info(f"Installing: {selected_pkg.filename} ...")
-    fake_install_progress(total_time=2)
-    logger.info("")
+    pkg_candidate_dict_by_vhash = {}
+    for pkg in pkg_candidates:
+        filename = unquote(pkg.filename)
+        logger.info(f"Found: `{filename}`")
+        variant_hash = get_variant_hash_from_wheel(filename)
+        pkg_candidate_dict_by_vhash[variant_hash] = pkg
 
-    logger.info(
-        f"The package: `{parsed_args.package_name}` "
-        f"(Version: `{selected_pkg.version}`) was installed with success ..."
-    )
+    logger.info("")  # visual spacing
+
+    if (forced_vhash := os.environ.get("PIP_FORCE_INSTALL_VARIANT_HASH", None)) is None:
+        selected_pkg = None
+        for vid, vdesc in enumerate(get_variant_hashes_by_priority()):
+            vhash = vdesc.hexdigest
+            selected_pkg = pkg_candidate_dict_by_vhash.get(vhash)
+
+            logger.info(
+                f"[Variant: {vid:04d}] `{vhash}`: "
+                f"{'FOUND' if selected_pkg is not None else 'NOT FOUND'} ..."
+            )
+
+            if selected_pkg is not None:
+                logger.info("Selected Variant:")
+                from pprint import pprint
+
+                pprint(vdesc.serialize())
+                break
+
+        else:
+            # The one package without variant information
+            selected_pkg = pkg_candidate_dict_by_vhash[None]
+
+    elif re.match(rf"^[a-fA-F0-9]{{{VARIANT_HASH_LEN}}}$", forced_vhash) is not None:
+        logger.info(f"Forced installation of variant: {forced_vhash}")
+        selected_pkg = pkg_candidate_dict_by_vhash.get(forced_vhash)
+
+    else:
+        logger.info("Forced installation to ignore variant ...")
+        selected_pkg = pkg_candidate_dict_by_vhash.get(None)
+
+    if selected_pkg is not None:
+        logger.info("")
+        logger.info(f"Installing: {selected_pkg.filename} ...")
+        fake_install_progress(total_time=2)
+        logger.info("")
+
+        logger.info(
+            f"The package: `{parsed_args.package_name}` "
+            f"(Version: `{selected_pkg.version}`) was installed with success ..."
+        )
+
+    else:
+        logger.error("Impossible to find a suitable package to install ...")
 
     return 0
