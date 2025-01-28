@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 def get_variant_hash_from_wheel(filename: str):
     wheel_file_re = re.compile(
         r"""^(?P<namever>(?P<name>[^\s-]+?)-(?P<ver>[^\s-]*?))
-        ((-(?P<build>\d[^-]*?))?(-\@(?P<variant_hash>[0-9a-fA-F]{8}))?
+        ((-(?P<build>\d[^-]*?))?(-@(?P<variant_hash>[0-9a-f]{8}))?
         -(?P<pyver>[^\s-]+?)-(?P<abi>[^\s-]+?)-(?P<plat>[^\s-]+?)
         \.whl|\.dist-info)$""",
         re.VERBOSE,
@@ -67,7 +67,7 @@ def get_variant_hashes_by_priority(
     provider_priority_dict: dict[str:int] | None = None,
 ) -> Generator[VariantDescription]:
     logger.info("Discovering plugins...")
-    plugins = entry_points().select(group="mockpip.plugins")
+    plugins = entry_points().select(group="variantlib.plugins")
 
     if provider_priority_dict is not None:
         plugins = [

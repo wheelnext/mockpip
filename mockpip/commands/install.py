@@ -96,17 +96,14 @@ def install(args: list[str]) -> int:
                 vhash = vdesc.hexdigest
                 selected_pkg = pkg_candidate_dict_by_vhash.get(vhash)
 
-                logger.info(
-                    f"[Variant: {vid:04d}] `{vhash}`: "
-                    f"{'FOUND' if selected_pkg is not None else 'NOT FOUND'} ..."
-                )
-
                 if selected_pkg is not None:
-                    logger.info("Selected Variant:")
-                    from pprint import pprint
-
-                    pprint(vdesc.serialize())
+                    logger.info(f"{'#' * 27} Best Variant: `{vhash}` {'#' * 27}")
+                    for vmeta in vdesc.data:
+                        logger.info(f"Variant-Data: {vmeta.to_str()}")
+                    logger.info("#" * 80)
                     break
+
+                logger.debug(f"[Variant: {vid:04d}] `{vhash}`: NOT FOUND ...")
 
             else:
                 # The one package without variant information
