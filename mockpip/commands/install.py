@@ -72,6 +72,8 @@ def install(args: list[str]) -> int:
     pkg_candidate_dict_by_vhash = {}
     for pkg in pkg_candidates:
         filename = unquote(pkg.filename)
+        if filename[-4:] != ".whl":
+            continue
         logger.info(f"Found: `{filename}`")
         variant_hash = get_variant_hash_from_wheel(filename)
         pkg_candidate_dict_by_vhash[variant_hash] = pkg

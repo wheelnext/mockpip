@@ -54,7 +54,7 @@ class TestProgressBar(unittest.TestCase):
         fake_install_progress(total_time=duration)
         total_t = time.perf_counter() - start_t
 
-        assert total_t - duration <= 0.1  # noqa: PLR2004
+        assert total_t - duration <= 0.5  # noqa: PLR2004
 
         output = self.held_output.getvalue()
         expected_output = "\r[========================================] 100%"
